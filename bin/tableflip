@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+
+$: << File.expand_path('../lib', File.dirname(__FILE__))
+
+require 'tableflip'
+
+strategy = Tableflip::ArgumentParser.new.parse(ARGV)
+
+Tableflip::Executor.new.execute!(strategy)

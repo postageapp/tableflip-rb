@@ -9,12 +9,33 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Scott Tadman"]
-  s.date = "2013-03-13"
+  s.date = "2013-03-14"
   s.description = "Flips tables from one database to another"
   s.email = "scott@twg.ca"
+  s.executables = ["tableflip"]
   s.extra_rdoc_files = [
     "LICENSE.txt",
     "README.md"
+  ]
+  s.files = [
+    ".document",
+    "Gemfile",
+    "LICENSE.txt",
+    "README.md",
+    "Rakefile",
+    "VERSION",
+    "bin/tableflip",
+    "lib/tableflip.rb",
+    "lib/tableflip/argument_parser.rb",
+    "lib/tableflip/database_handle.rb",
+    "lib/tableflip/executor.rb",
+    "lib/tableflip/strategy.rb",
+    "tableflip.gemspec",
+    "test/config/.gitignore",
+    "test/helper.rb",
+    "test/unit/test_tableflip.rb",
+    "test/unit/test_tableflip_argument_parser.rb",
+    "test/unit/test_tableflip_strategy.rb"
   ]
   s.homepage = "http://github.com/twg/tableflip"
   s.licenses = ["MIT"]
@@ -27,15 +48,21 @@ Gem::Specification.new do |s|
 
     if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
       s.add_runtime_dependency(%q<mysql2>, [">= 0"])
+      s.add_runtime_dependency(%q<eventmachine>, [">= 0"])
+      s.add_runtime_dependency(%q<em-synchrony>, [">= 0"])
       s.add_development_dependency(%q<bundler>, [">= 1.0.0"])
       s.add_development_dependency(%q<jeweler>, [">= 1.8.4"])
     else
       s.add_dependency(%q<mysql2>, [">= 0"])
+      s.add_dependency(%q<eventmachine>, [">= 0"])
+      s.add_dependency(%q<em-synchrony>, [">= 0"])
       s.add_dependency(%q<bundler>, [">= 1.0.0"])
       s.add_dependency(%q<jeweler>, [">= 1.8.4"])
     end
   else
     s.add_dependency(%q<mysql2>, [">= 0"])
+    s.add_dependency(%q<eventmachine>, [">= 0"])
+    s.add_dependency(%q<em-synchrony>, [">= 0"])
     s.add_dependency(%q<bundler>, [">= 1.0.0"])
     s.add_dependency(%q<jeweler>, [">= 1.8.4"])
   end

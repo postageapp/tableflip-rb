@@ -50,6 +50,10 @@ class Tableflip::Executor
     tables = { }
 
     EventMachine.synchrony do
+      timer = EventMachine::PeriodicTimer.new(1) do
+        # puts tables.inspect
+      end
+
       await do
         strategy.tables.each do |table|
           defer do
@@ -83,25 +87,32 @@ class Tableflip::Executor
     deferred = db.query(query)
 
     deferred.callback do |result|
-      fiber.resume(result)
+      EventMachine.next_tick do
+        fiber.resume(result)
+      end
     end
 
     deferred.errback do |err|
-      fiber.resume(err)
+      EventMachine.next_tick do
+        fiber.resume(err)
+      end
     end
 
-    Fiber.yield
+    case (response = Fiber.yield)
+    when Exception
+      raise response
+    else
+      response
+    end
   end
 
   def table_exists?(db, table)
-    result = do_query(db, "SHOW FIELDS FROM `#{table}`")
+    do_query(db, "SHOW FIELDS FROM `#{table}`")
 
-    case (result)
-    when Mysql2::Error
-      false
-    else
-      true
-    end
+    true
+
+  rescue Mysql2::Error
+    false
   end
 
   def add_tracking(db, table)
@@ -117,7 +128,7 @@ class Tableflip::Executor
   def remove_tracking(db, table)
     changes_table = "#{table}__changes"
 
-    if (db.table_exists?(changes_table))
+    if (table_exists?(db, changes_table))
       do_query(db, "DROP TABLE IF EXISTS `#{table}__changes`")
     else
       STDERR.puts("Table #{changes_table} does not exist. Not removed.")

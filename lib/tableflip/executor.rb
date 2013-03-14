@@ -5,19 +5,17 @@ class Tableflip::Executor
   def await
     @await ||= Hash.new { |h, k| h[k] = [ ] }
 
-    Fiber.new do
-      fibers = @await[Fiber.current]
+    fibers = @await[Fiber.current]
 
-      fibers << Fiber.current
+    fibers << Fiber.current
 
-      yield if (block_given?)
+    yield if (block_given?)
 
-      fibers.delete(Fiber.current)
+    fibers.delete(Fiber.current)
 
-      while (fibers.any?)
-        Fiber.yield
-      end
-    end.resume
+    while (fibers.any?)
+      Fiber.yield
+    end
   end
 
   def defer
@@ -81,10 +79,15 @@ class Tableflip::Executor
   end
 
   def do_query(db, query)
+    fiber = Fiber.current
     deferred = db.query(query)
 
     deferred.callback do |result|
-      Fiber.resume(result)
+      fiber.resume(result)
+    end
+
+    deferred.errback do |err|
+      fiber.resume(err)
     end
 
     Fiber.yield
@@ -93,7 +96,12 @@ class Tableflip::Executor
   def table_exists?(db, table)
     result = do_query(db, "SHOW FIELDS FROM `#{table}`")
 
-    puts result.inspect
+    case (result)
+    when Mysql2::Error
+      false
+    else
+      true
+    end
   end
 
   def add_tracking(db, table)
@@ -102,7 +110,7 @@ class Tableflip::Executor
     if (table_exists?(db, changes_table))
       STDERR.puts("Table #{changes_table} already exists. Not recreated.")
     else
-      db["CREATE TABLE `#{changes_table}` (id INT PRIMARY KEY, claim INT, INDEX index_claim (claim))"].update
+      do_query(db, "CREATE TABLE `#{changes_table}` (id INT PRIMARY KEY, claim INT, INDEX index_claim (claim))")
     end
   end
 
@@ -110,7 +118,7 @@ class Tableflip::Executor
     changes_table = "#{table}__changes"
 
     if (db.table_exists?(changes_table))
-      db["DROP TABLE IF EXISTS `#{table}__changes`"].update
+      do_query(db, "DROP TABLE IF EXISTS `#{table}__changes`")
     else
       STDERR.puts("Table #{changes_table} does not exist. Not removed.")
     end

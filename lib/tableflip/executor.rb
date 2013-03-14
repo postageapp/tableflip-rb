@@ -90,8 +90,12 @@ class Tableflip::Executor
                 target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
                 table_migrate(source_db, target_db, table_config)
               when :table_report_status
+                @strategy.complete = false
+
                 target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
                 table_report_status(source_db, target_db, table_config)
+
+                @strategy.complete = true
               when :table_count
                 table_count(source_db, target_db, table_config)
               when :table_create_test

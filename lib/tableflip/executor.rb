@@ -72,6 +72,9 @@ class Tableflip::Executor
                 add_tracking(source_db, table)
               when :remove
                 remove_tracking(source_db, table)
+              when :migrate
+                target_db = Tableflip::DatabaseHandle.connect(strategy.target_env)
+                migrate(source_db, target_db, table)
               end
             end
           end
@@ -122,6 +125,8 @@ class Tableflip::Executor
       STDERR.puts("Table #{changes_table} already exists. Not recreated.")
     else
       do_query(db, "CREATE TABLE `#{changes_table}` (id INT PRIMARY KEY, claim INT, INDEX index_claim (claim))")
+      do_query(db, "CREATE TRIGGER `#{table}__tai` AFTER INSERT ON `#{table}` FOR EACH ROW INSERT IGNORE INTO `#{changes_table}` (id) VALUES (NEW.id) ON DUPLICATE KEY UPDATE claim=NULL")
+      do_query(db, "CREATE TRIGGER `#{table}__tau` AFTER UPDATE ON `#{table}` FOR EACH ROW INSERT IGNORE INTO `#{changes_table}` (id) VALUES (NEW.id) ON DUPLICATE KEY UPDATE claim=NULL")
     end
   end
 
@@ -130,8 +135,13 @@ class Tableflip::Executor
 
     if (table_exists?(db, changes_table))
       do_query(db, "DROP TABLE IF EXISTS `#{table}__changes`")
+      do_query(db, "DROP TRIGGER IF EXISTS `#{table}__tai`")
+      do_query(db, "DROP TRIGGER IF EXISTS `#{table}__tau`")
     else
       STDERR.puts("Table #{changes_table} does not exist. Not removed.")
     end
+  end
+
+  def migrate(source_db, target_db, table)
   end
 end

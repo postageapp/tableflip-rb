@@ -6,4 +6,4 @@ require 'tableflip'
 
 strategy = Tableflip::ArgumentParser.new.parse(ARGV)
 
-Tableflip::Executor.new.execute!(strategy)
+Tableflip::Executor.new(strategy).execute!

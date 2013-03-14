@@ -9,7 +9,10 @@ class Tableflip::Strategy
   attr_accessor :tables
   attr_accessor :target_env
   attr_accessor :message
-  
+  attr_accessor :complete
+  attr_accessor :fuzz_intensity
+  attr_accessor :block_size
+
   # == Class Methods ========================================================
 
   # == Instance Methods =====================================================
@@ -17,7 +20,13 @@ class Tableflip::Strategy
   def initialize
     @actions = [ ]
     @tables = [ ]
+    @fuzz_intensity = 1
+    @block_size = 1000
 
     yield(self) if (block_given?)
+  end
+
+  def complete?
+    !!@complete
   end
 end

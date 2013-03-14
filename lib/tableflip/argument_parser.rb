@@ -41,27 +41,37 @@ class Tableflip::ArgumentParser
       parser.separator("")
       parser.separator("Options:")
 
-      parser.on("-c", "--config=s") do |path|
+      parser.on("-f", "--config=s") do |path|
         strategy.config_path = path
       end
       parser.on("-t", "--track", "Add tracking triggers on tables") do
-        strategy.actions << :track
+        strategy.actions << :tracking_add
+      end
+      parser.on("-r", "--remove", "Remove tracking triggers from tables") do
+        strategy.actions << :tracking_remove
       end
       parser.on("-m", "--migrate=s", "Migrate tables to environment") do |s|
-        strategy.actions << :migrate
+        strategy.actions << :table_migrate
         strategy.target_env = s
       end
       parser.on("-c", "--count", "Count number of records in source table") do
-        strategy.actions << :count
+        strategy.actions << :table_count
       end
-      parser.on("-p", "--pending", "Count number of pending changes") do
-        strategy.actions << :pending
+      parser.on("-s", "--status", "Show current status") do
+        strategy.actions << :table_report_status
       end
-      parser.on("-e", "--env=s", "Establish primary environment") do
+      parser.on("-e", "--env=s", "Establish primary environment") do |s|
         strategy.source_env = s
       end
-      parser.on("-r", "--remove", "Remove tracking triggers from tables") do
-        strategy.actions << :remove
+      parser.on("-k", "--create-test", "Creates a test table") do
+        strategy.actions << :table_create_test
+      end
+      parser.on("-z", "--fuzz[=d]", "Inserts and alters records on test table") do |d|
+        strategy.actions << :table_fuzz
+
+        if (d)
+          strategy.fuzz_intensity = d.to_i
+        end
       end
       parser.on("-h", "--help", "Display this help") do
         strategy.message = parser.to_s

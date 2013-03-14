@@ -1,5 +1,12 @@
 class Tableflip::Executor
-  def initialize
+  def initialize(strategy)
+    @strategy = strategy
+
+    @time_format = '%Y-%m-%d %H:%M:%S'
+  end
+
+  def log(message)
+    puts "[%s] %s" % [ Time.now.strftime(@time_format), message ]
   end
 
   def await
@@ -38,12 +45,12 @@ class Tableflip::Executor
     end
   end
 
-  def execute!(strategy)
+  def execute!
     require 'eventmachine'
     require 'em-synchrony'
 
-    if (strategy.message)
-      puts strategy.message
+    if (@strategy.message)
+      puts @strategy.message
       exit(0)
     end
 
@@ -51,42 +58,78 @@ class Tableflip::Executor
 
     EventMachine.synchrony do
       timer = EventMachine::PeriodicTimer.new(1) do
-        # puts tables.inspect
+        if (@strategy.complete?)
+          EventMachine.stop_event_loop
+        end
       end
 
-      await do
-        strategy.tables.each do |table|
-          defer do
-            queue = strategy.actions.dup
-            source_db = Tableflip::DatabaseHandle.connect(strategy.source_env)
+      @strategy.complete = true
 
-            tables[table] = {
-              :status => nil,
+      await do
+        @strategy.tables.each do |table|
+          defer do
+            queue = @strategy.actions.dup
+            source_db = Tableflip::DatabaseHandle.connect(@strategy.source_env)
+
+            table_config = tables[table] = {
+              :table => table,
               :queue => queue
             }
           
             while (action = queue.shift)
-              puts "#{table} [#{action}]"
+              log("#{table} [#{action}]")
+
               case (action)
-              when :track
-                add_tracking(source_db, table)
-              when :remove
-                remove_tracking(source_db, table)
-              when :migrate
-                target_db = Tableflip::DatabaseHandle.connect(strategy.target_env)
-                migrate(source_db, target_db, table)
+              when :tracking_add
+                tracking_add(source_db, table_config)
+              when :tracking_remove
+                tracking_remove(source_db, table_config)
+              when :table_migrate
+                @strategy.complete = false
+
+                target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
+                table_migrate(source_db, target_db, table_config)
+              when :table_report_status
+                table_report_status(source_db, target_db, table_config)
+              when :table_count
+                table_count(source_db, target_db, table_config)
+              when :table_create_test
+                table_create_test(source_db, table_config)
+              when :table_fuzz
+                @strategy.complete = false
+
+                table_fuzz(source_db, table_config, @strategy.fuzz_intensity)
               end
             end
           end
         end
       end
-
-      EventMachine.stop_event_loop
     end
   end
 
-  def do_query(db, query)
+  def escaper(db, value)
+    case (value)
+    when nil
+      'NULL'
+    when Fixnum
+      value
+    when Date
+      '"' + db.escape(value.strftime('%Y-%m-%d')) + '"'
+    when DateTime, Time
+      '"' + db.escape(value.utc.strftime('%Y-%m-%d %H:%M:%S')) + '"'
+    when Array
+      value.collect { |v| escaper(db, v) }.join(',')
+    else
+      '"' + db.escape(value.to_s) + '"'
+    end
+  end
+
+  def do_query(db, query, *values)
     fiber = Fiber.current
+    query = query.gsub('?') do |s|
+      escaper(db, values.shift)
+    end
+
     deferred = db.query(query)
 
     deferred.callback do |result|
@@ -118,7 +161,8 @@ class Tableflip::Executor
     false
   end
 
-  def add_tracking(db, table)
+  def tracking_add(db, table_config)
+    table = table_config[:table]
     changes_table = "#{table}__changes"
 
     if (table_exists?(db, changes_table))
@@ -130,7 +174,8 @@ class Tableflip::Executor
     end
   end
 
-  def remove_tracking(db, table)
+  def tracking_remove(db, table_config)
+    table = table_config[:table]
     changes_table = "#{table}__changes"
 
     if (table_exists?(db, changes_table))
@@ -142,6 +187,107 @@ class Tableflip::Executor
     end
   end
 
-  def migrate(source_db, target_db, table)
+  def table_migrate(source_db, target_db, table_config)
+    table = table_config[:table]
+    changes_table = "#{table}__changes"
+
+    result = do_query(source_db, "SELECT COUNT(*) AS rows FROM `#{table}`")
+    count = table_config[:count] = result.first[:rows]
+
+    log("#{table} has #{table_config[:count]} records.")
+
+    next_claim = do_query(source_db, "SELECT MAX(claim) AS claim FROM `#{changes_table}`").first[:claim] || 0
+
+    Fiber.new do
+      result = do_query(source_db, "SHOW FIELDS FROM `#{table}`")
+      columns = result.collect { |r| r[:Field].to_sym }
+
+      result = do_query(source_db, "SELECT id FROM `#{table}`")
+
+      ids = result.collect { |r| r[:id] }
+
+      log("Populating #{changes_table} from #{table}")
+
+      (count / @strategy.block_size).times do |n|
+        start_offset = @strategy.block_size * n
+        id_block = ids[start_offset, @strategy.block_size]
+
+        query = "INSERT IGNORE INTO `#{changes_table}` (id) VALUES %s" % [
+          id_block.collect { |id| "(%d)" % id }.join(',')
+        ]
+
+        do_query(source_db, query)
+      end
+
+      loop do
+        next_claim += 1
+        do_query(source_db, "UPDATE `#{changes_table}` SET claim=? WHERE claim IS NULL LIMIT ?", next_claim, @strategy.block_size)
+
+        result = do_query(source_db, "SELECT id FROM `#{changes_table}` WHERE claim=?", next_claim)
+
+        id_block = result.to_a.collect { |r| r[:id] }
+
+        unless (id_block.length > 0)
+          @strategy.complete = true
+
+          break
+        end
+
+        log("Claim \##{next_claim} yields #{id_block.length} records.")
+
+        selected = do_query(source_db, "SELECT * FROM `#{table}` WHERE id IN (?)", id_block)
+
+        values = selected.collect do |row|
+          "(%s)" % [
+            escaper(
+              source_db,
+              columns.collect do |column|
+                row[column]
+              end
+            )
+          ]
+        end.join(',')
+
+        do_query(target_db, "REPLACE INTO `#{table}` (#{columns.join(',')}) VALUES #{values}")
+      end
+    end.resume
+  end
+
+  def table_create_test(db, table_config)
+    table = table_config[:table]
+
+    do_query(db, "CREATE TABLE `#{table}` (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), created_at DATETIME, updated_at DATETIME)")
+  rescue Mysql2::Error => e
+    puts e.to_s
+  end
+
+  def table_fuzz(db, table_config, count)
+    require 'securerandom'
+
+    table = table_config[:table]
+
+    EventMachine::PeriodicTimer.new(1) do
+      unless (@inserting)
+        @inserting = true
+
+        Fiber.new do
+          now = Time.now.utc.strftime('%Y-%m-%d %H:%M:%S')
+
+          log("Adding #{count} rows to #{table}")
+
+          count.times do
+            do_query(db,
+              "INSERT IGNORE INTO `#{table}` (id, name, created_at, updated_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), updated_at=VALUES(updated_at)",
+              SecureRandom.random_number(1<<20),
+              SecureRandom.hex,
+              now,
+              now
+            )
+          end
+
+          @inserting = false
+        end.resume
+      end
+    end
   end
 end

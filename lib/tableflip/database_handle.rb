@@ -8,6 +8,7 @@ class Tableflip::DatabaseHandle
   DATABASE_CONFIG_FILE ='database.yml'
 
   DEFAULT_OPTIONS = {
+    :symbolize_keys => true,
     :encoding => 'UTF8'
   }.freeze
 

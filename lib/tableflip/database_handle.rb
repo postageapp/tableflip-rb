@@ -1,4 +1,5 @@
-require 'sequel'
+require 'mysql2'
+require 'mysql2/em'
 require 'yaml'
 
 class Tableflip::DatabaseHandle
@@ -12,7 +13,7 @@ class Tableflip::DatabaseHandle
 
   PARAM_MAP = Hash.new do |h, k|
     k.to_sym
-  end.merge('username' => :user).freeze
+  end
 
   # == Class Methods ========================================================
 
@@ -75,7 +76,7 @@ class Tableflip::DatabaseHandle
   end
 
   def self.connect(env)
-    Sequel.connect(self.environment_config(env))
+    Mysql2::EM::Client.new(self.environment_config(env))
   end
 
   # == Instance Methods =====================================================

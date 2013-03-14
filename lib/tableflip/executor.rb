@@ -14,7 +14,7 @@ class Tableflip::Executor
 
       fibers.delete(Fiber.current)
 
-      if (fibers.any?)
+      while (fibers.any?)
         Fiber.yield
       end
     end.resume
@@ -25,15 +25,19 @@ class Tableflip::Executor
 
     fibers = @await[parent_fiber]
 
-    fibers << Fiber.new do
+    fiber = Fiber.new do
       yield if (block_given?)
 
       fibers.delete(Fiber.current)
 
-      if (fibers.empty?)
-        EventMachine.next_tick(parent_fiber.resume)
-      end
-    end.resume
+      parent_fiber.resume
+    end
+
+    fibers << fiber
+
+    EventMachine.next_tick do
+      fiber.resume
+    end
   end
 
   def execute!(strategy)
@@ -76,10 +80,26 @@ class Tableflip::Executor
     end
   end
 
+  def do_query(db, query)
+    deferred = db.query(query)
+
+    deferred.callback do |result|
+      Fiber.resume(result)
+    end
+
+    Fiber.yield
+  end
+
+  def table_exists?(db, table)
+    result = do_query(db, "SHOW FIELDS FROM `#{table}`")
+
+    puts result.inspect
+  end
+
   def add_tracking(db, table)
     changes_table = "#{table}__changes"
 
-    if (db.table_exists?(changes_table))
+    if (table_exists?(db, changes_table))
       STDERR.puts("Table #{changes_table} already exists. Not recreated.")
     else
       db["CREATE TABLE `#{changes_table}` (id INT PRIMARY KEY, claim INT, INDEX index_claim (claim))"].update

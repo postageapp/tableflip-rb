@@ -236,13 +236,15 @@ class Tableflip::Executor
 
       log("Populating #{changes_table} from #{table}")
 
-      (count / @strategy.block_size).times do |n|
+      ((count / @strategy.block_size) + 1).times do |n|
         start_offset = @strategy.block_size * n
         id_block = ids[start_offset, @strategy.block_size]
 
-        query = "INSERT IGNORE INTO `#{changes_table}` (id) VALUES %s" % [
-          id_block.collect { |id| "(%d)" % id }.join(',')
-        ]
+        if (id_block and id_block.any?)
+          query = "INSERT IGNORE INTO `#{changes_table}` (id) VALUES %s" % [
+            id_block.collect { |id| "(%d)" % id }.join(',')
+          ]
+        end
 
         do_query(source_db, query)
       end

@@ -90,6 +90,7 @@ class Tableflip::Executor
                 target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
                 table_migrate(source_db, target_db, table_config)
               when :table_report_status
+                target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
                 table_report_status(source_db, target_db, table_config)
               when :table_count
                 table_count(source_db, target_db, table_config)
@@ -187,6 +188,29 @@ class Tableflip::Executor
     end
   end
 
+  def table_report_status(source_db, target_db, table_config)
+    table = table_config[:table]
+    changes_table = "#{table}__changes"
+
+    source_table_count = do_query(source_db, "SELECT COUNT(*) AS count FROM `#{table}`").first[:count]
+    target_table_count = do_query(target_db, "SELECT COUNT(*) AS count FROM `#{table}`").first[:count]
+    migrated_count = do_query(source_db, "SELECT COUNT(*) AS count FROM `#{changes_table}` WHERE claim IS NOT NULL").first[:count]
+    tracked_count = do_query(source_db, "SELECT COUNT(*) AS count FROM `#{changes_table}`").first[:count]
+
+    percentage = tracked_count > 0 ? (migrated_count.to_f * 100 / tracked_count) : 0.0
+
+    log(
+      "%s: %d/%d [%d/%d] (%.1f%%)" % [
+        table,
+        source_table_count,
+        target_table_count,
+        migrated_count,
+        tracked_count,
+        percentage
+      ]
+    )
+  end
+
   def table_migrate(source_db, target_db, table_config)
     table = table_config[:table]
     changes_table = "#{table}__changes"
@@ -219,36 +243,44 @@ class Tableflip::Executor
         do_query(source_db, query)
       end
 
-      loop do
-        next_claim += 1
-        do_query(source_db, "UPDATE `#{changes_table}` SET claim=? WHERE claim IS NULL LIMIT ?", next_claim, @strategy.block_size)
+      @migrating ||= { }
 
-        result = do_query(source_db, "SELECT id FROM `#{changes_table}` WHERE claim=?", next_claim)
+      EventMachine::PeriodicTimer.new(1) do
+        unless (@migrating[table])
+          Fiber.new do
+            @migrating[table] = true
+            
+            next_claim += 1
+            do_query(source_db, "UPDATE `#{changes_table}` SET claim=? WHERE claim IS NULL LIMIT ?", next_claim, @strategy.block_size)
 
-        id_block = result.to_a.collect { |r| r[:id] }
+            result = do_query(source_db, "SELECT id FROM `#{changes_table}` WHERE claim=?", next_claim)
 
-        unless (id_block.length > 0)
-          @strategy.complete = true
+            id_block = result.to_a.collect { |r| r[:id] }
 
-          break
+            if (id_block.length > 0)
+              log("Claim \##{next_claim} yields #{id_block.length} records.")
+
+              selected = do_query(source_db, "SELECT * FROM `#{table}` WHERE id IN (?)", id_block)
+
+              values = selected.collect do |row|
+                "(%s)" % [
+                  escaper(
+                    source_db,
+                    columns.collect do |column|
+                      row[column]
+                    end
+                  )
+                ]
+              end.join(',')
+
+              do_query(target_db, "REPLACE INTO `#{table}` (#{columns.join(',')}) VALUES #{values}")
+            else
+              @strategy.complete = true
+            end
+  
+            @migrating[table] = false
+          end.resume
         end
-
-        log("Claim \##{next_claim} yields #{id_block.length} records.")
-
-        selected = do_query(source_db, "SELECT * FROM `#{table}` WHERE id IN (?)", id_block)
-
-        values = selected.collect do |row|
-          "(%s)" % [
-            escaper(
-              source_db,
-              columns.collect do |column|
-                row[column]
-              end
-            )
-          ]
-        end.join(',')
-
-        do_query(target_db, "REPLACE INTO `#{table}` (#{columns.join(',')}) VALUES #{values}")
       end
     end.resume
   end

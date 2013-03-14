@@ -50,9 +50,11 @@ class Tableflip::ArgumentParser
       parser.on("-r", "--remove", "Remove tracking triggers from tables") do
         strategy.actions << :tracking_remove
       end
-      parser.on("-m", "--migrate=s", "Migrate tables to environment") do |s|
-        strategy.actions << :table_migrate
+      parser.on("-o", "--target=s", "Set target environment") do |s|
         strategy.target_env = s
+      end
+      parser.on("-m", "--migrate", "Migrate tables to environment") do
+        strategy.actions << :table_migrate
       end
       parser.on("-c", "--count", "Count number of records in source table") do
         strategy.actions << :table_count
@@ -72,6 +74,9 @@ class Tableflip::ArgumentParser
         if (d)
           strategy.fuzz_intensity = d.to_i
         end
+      end
+      parser.on("-p", "--persist", "Keep running perpetually") do
+        strategy.persist = true
       end
       parser.on("-h", "--help", "Display this help") do
         strategy.message = parser.to_s

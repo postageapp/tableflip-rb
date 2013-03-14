@@ -2,6 +2,16 @@
 
 MySQL Table Migration Tool
 
+## Background
+
+Maybe you have a number of large tables that need to be packed up and moved
+somewhere else. Maybe you've tried other methods that almost work but don't
+quite. This might be your only hope.
+
+## Inspiration
+
+(╯°□°）╯︵ ┻━┻
+
 ## Caveats
 
 This tool makes an extraordinary number of assumptions about how your data

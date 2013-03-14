@@ -2,6 +2,8 @@
 
 $: << File.expand_path('../lib', File.dirname(__FILE__))
 
+ENV['TZ'] = 'UTC'
+
 require 'tableflip'
 
 strategy = Tableflip::ArgumentParser.new.parse(ARGV)

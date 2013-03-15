@@ -202,7 +202,7 @@ class Tableflip::Executor
     table = table_config[:table]
     changes_table = "#{table}__changes"
 
-    result = do_query(source_db, "SELECT id FROM `#{table}` #{@strategy.where}")
+    result = do_query(db, "SELECT id FROM `#{table}` #{@strategy.where}")
 
     ids = result.collect { |r| r[:id] }
 
@@ -219,7 +219,7 @@ class Tableflip::Executor
           ]
         end
 
-        do_query(source_db, query)
+        do_query(db, query)
       end
     else
       log("No records to migrate from #{table}")

@@ -84,6 +84,8 @@ class Tableflip::Executor
                 tracking_add(source_db, table_config)
               when :tracking_remove
                 tracking_remove(source_db, table_config)
+              when :tracking_seed
+                tracking_seed(source_db, table_config)
               when :table_migrate
                 @strategy.complete = false
 

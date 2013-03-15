@@ -57,14 +57,6 @@ class Tableflip::Executor
     tables = { }
 
     EventMachine.synchrony do
-      timer = EventMachine::PeriodicTimer.new(1) do
-        if (@strategy.complete?)
-          EventMachine.stop_event_loop
-        end
-      end
-
-      @strategy.complete = true
-
       await do
         @strategy.tables.each do |table|
           defer do
@@ -92,25 +84,21 @@ class Tableflip::Executor
                 target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
                 table_migrate(source_db, target_db, table_config)
               when :table_report_status
-                @strategy.complete = false
-
                 target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
                 table_report_status(source_db, target_db, table_config)
-
-                @strategy.complete = true
               when :table_count
                 table_count(source_db, target_db, table_config)
               when :table_create_test
                 table_create_test(source_db, table_config)
               when :table_fuzz
-                @strategy.complete = false
-
                 table_fuzz(source_db, table_config, @strategy.fuzz_intensity)
               end
             end
           end
         end
       end
+
+      EventMachine.stop_event_loop
     end
   end
 
@@ -218,9 +206,11 @@ class Tableflip::Executor
           query = "INSERT IGNORE INTO `#{changes_table}` (id) VALUES %s" % [
             id_block.collect { |id| "(%d)" % id }.join(',')
           ]
-        end
 
-        do_query(db, query)
+          do_query(db, query)
+
+          log("%d/%d entries added to #{changes_table}" % [ start_offset + id_block.length, ids.length ])
+        end
       end
     else
       log("No records to migrate from #{table}")
@@ -266,6 +256,8 @@ class Tableflip::Executor
 
     @migrating ||= { }
 
+    fiber = Fiber.current
+
     EventMachine::PeriodicTimer.new(1) do
       unless (@migrating[table])
         Fiber.new do
@@ -297,7 +289,7 @@ class Tableflip::Executor
             do_query(target_db, "REPLACE INTO `#{table}` (#{columns.join(',')}) VALUES #{values}")
           else
             unless (@strategy.persist?)
-              @strategy.complete = true
+              fiber.resume
             end
           end
 
@@ -305,6 +297,8 @@ class Tableflip::Executor
         end.resume
       end
     end
+
+    Fiber.yield
   end
 
   def table_create_test(db, table_config)

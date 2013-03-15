@@ -24,7 +24,7 @@ class Tableflip::Strategy
     @actions = [ ]
     @tables = [ ]
     @fuzz_intensity = 1
-    @block_size = 1000
+    @block_size = 10000
 
     yield(self) if (block_given?)
   end

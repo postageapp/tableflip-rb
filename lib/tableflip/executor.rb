@@ -258,52 +258,46 @@ class Tableflip::Executor
 
     fiber = Fiber.current
     migrated = 0
+    selected = 1
 
-    EventMachine::PeriodicTimer.new(1) do
-      unless (@migrating[table])
-        Fiber.new do
-          @migrating[table] = true
-          
-          next_claim += 1
-          do_query(source_db, "UPDATE `#{changes_table}` SET claim=? WHERE claim IS NULL LIMIT ?", next_claim, @strategy.block_size)
+    loop do
+      next_claim += 1
+      do_query(source_db, "UPDATE `#{changes_table}` SET claim=? WHERE claim IS NULL LIMIT ?", next_claim, @strategy.block_size)
 
-          result = do_query(source_db, "SELECT id FROM `#{changes_table}` WHERE claim=?", next_claim)
+      result = do_query(source_db, "SELECT id FROM `#{changes_table}` WHERE claim=?", next_claim)
 
-          id_block = result.to_a.collect { |r| r[:id] }
+      id_block = result.to_a.collect { |r| r[:id] }
 
-          if (id_block.length > 0)
-            log("Claim \##{next_claim} yields #{id_block.length} records.")
-
-            selected = do_query(source_db, "SELECT * FROM `#{table}` WHERE id IN (?)", id_block)
-
-            values = selected.collect do |row|
-              "(%s)" % [
-                escaper(
-                  source_db,
-                  columns.collect do |column|
-                    row[column]
-                  end
-                )
-              ]
-            end
-
-            do_query(target_db, "REPLACE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}")
-
-            migrated += values.length
-
-            log("Migrated %d/%d records for #{table}" % [ migrated, count ])
-          else
-            unless (@strategy.persist?)
-              fiber.resume
-            end
-          end
-
-          @migrating[table] = false
-        end.resume
+      if (id_block.length == 0)
+        if (@strategy.persist?)
+          sleep(1)
+        else
+          break
+        end
       end
-    end
 
-    Fiber.yield
+      log("Claim \##{next_claim} yields #{id_block.length} records.")
+
+      selected = do_query(source_db, "SELECT * FROM `#{table}` WHERE id IN (?)", id_block)
+
+      values = selected.collect do |row|
+        "(%s)" % [
+          escaper(
+            source_db,
+            columns.collect do |column|
+              row[column]
+            end
+          )
+        ]
+      end
+
+      do_query(target_db, "REPLACE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}")
+
+      selected = values.length
+      migrated += values.length
+
+      log("Migrated %d/%d records for #{table}" % [ migrated, count ])
+    end
   end
 
   def table_create_test(db, table_config)

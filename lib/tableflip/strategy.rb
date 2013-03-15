@@ -14,6 +14,7 @@ class Tableflip::Strategy
   attr_accessor :block_size
   attr_accessor :persist
   attr_accessor :where
+  attr_accessor :debug_queries
 
   # == Class Methods ========================================================
 
@@ -34,5 +35,9 @@ class Tableflip::Strategy
 
   def complete?
     !!@complete
+  end
+
+  def debug_queries?
+    !!@debug_queries
   end
 end

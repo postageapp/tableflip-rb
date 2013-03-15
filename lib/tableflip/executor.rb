@@ -135,6 +135,10 @@ class Tableflip::Executor
       escaper(db, values.shift)
     end
 
+    if (@strategy.debug_queries?)
+      puts "SQL> #{query}"
+    end
+
     deferred = db.query(query)
 
     deferred.callback do |result|

@@ -84,6 +84,9 @@ class Tableflip::ArgumentParser
       parser.on("-w","--where=s", "Add conditions to selecting") do |s|
         strategy.where = s
       end
+      parser.on("-q", "--debug", "Show the queries as they're executed") do
+        strategy.debug_queries = true
+      end
       parser.on("-h", "--help", "Display this help") do
         strategy.message = parser.to_s
       end

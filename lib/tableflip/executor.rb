@@ -205,9 +205,10 @@ class Tableflip::Executor
     result = do_query(db, "SELECT id FROM `#{table}` #{@strategy.where}")
 
     ids = result.collect { |r| r[:id] }
+    GC.start
 
     if (ids.any?)
-      log("Populating #{changes_table} from #{table}")
+      log("Populating #{ids.length} entries into #{changes_table} from #{table}")
 
       ((ids.length / @strategy.block_size) + 1).times do |n|
         start_offset = @strategy.block_size * n

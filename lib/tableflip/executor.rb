@@ -257,6 +257,7 @@ class Tableflip::Executor
     @migrating ||= { }
 
     fiber = Fiber.current
+    migrated = 0
 
     EventMachine::PeriodicTimer.new(1) do
       unless (@migrating[table])
@@ -287,6 +288,10 @@ class Tableflip::Executor
             end.join(',')
 
             do_query(target_db, "REPLACE INTO `#{table}` (#{columns.join(',')}) VALUES #{values}")
+
+            migrated += selected.length
+
+            log("Migrated %d/%d records for #{table}" % [ migrated, count ])
           else
             unless (@strategy.persist?)
               fiber.resume

@@ -285,11 +285,11 @@ class Tableflip::Executor
                   end
                 )
               ]
-            end.join(',')
+            end
 
-            do_query(target_db, "REPLACE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values}")
+            do_query(target_db, "REPLACE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}")
 
-            migrated += selected.length
+            migrated += values.length
 
             log("Migrated %d/%d records for #{table}" % [ migrated, count ])
           else

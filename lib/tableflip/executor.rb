@@ -196,30 +196,28 @@ class Tableflip::Executor
     table = table_config[:table]
     changes_table = "#{table}__changes"
 
-    Fiber.new do
-      result = do_query(source_db, "SELECT id FROM `#{table}` #{@strategy.where}")
+    result = do_query(source_db, "SELECT id FROM `#{table}` #{@strategy.where}")
 
-      ids = result.collect { |r| r[:id] }
+    ids = result.collect { |r| r[:id] }
 
-      if (ids.any?)
-        log("Populating #{changes_table} from #{table}")
+    if (ids.any?)
+      log("Populating #{changes_table} from #{table}")
 
-        ((ids.length / @strategy.block_size) + 1).times do |n|
-          start_offset = @strategy.block_size * n
-          id_block = ids[start_offset, @strategy.block_size]
+      ((ids.length / @strategy.block_size) + 1).times do |n|
+        start_offset = @strategy.block_size * n
+        id_block = ids[start_offset, @strategy.block_size]
 
-          if (id_block and id_block.any?)
-            query = "INSERT IGNORE INTO `#{changes_table}` (id) VALUES %s" % [
-              id_block.collect { |id| "(%d)" % id }.join(',')
-            ]
-          end
-
-          do_query(source_db, query)
+        if (id_block and id_block.any?)
+          query = "INSERT IGNORE INTO `#{changes_table}` (id) VALUES %s" % [
+            id_block.collect { |id| "(%d)" % id }.join(',')
+          ]
         end
-      else
-        log("No records to migrate from #{table}")
+
+        do_query(source_db, query)
       end
-    end.resume
+    else
+      log("No records to migrate from #{table}")
+    end
   end
 
   def table_report_status(source_db, target_db, table_config)
@@ -256,52 +254,50 @@ class Tableflip::Executor
 
     next_claim = do_query(source_db, "SELECT MAX(claim) AS claim FROM `#{changes_table}`").first[:claim] || 0
 
-    Fiber.new do
-      result = do_query(source_db, "SHOW FIELDS FROM `#{table}`")
-      columns = result.collect { |r| r[:Field].to_sym }
+    result = do_query(source_db, "SHOW FIELDS FROM `#{table}`")
+    columns = result.collect { |r| r[:Field].to_sym }
 
-      @migrating ||= { }
+    @migrating ||= { }
 
-      EventMachine::PeriodicTimer.new(1) do
-        unless (@migrating[table])
-          Fiber.new do
-            @migrating[table] = true
-            
-            next_claim += 1
-            do_query(source_db, "UPDATE `#{changes_table}` SET claim=? WHERE claim IS NULL LIMIT ?", next_claim, @strategy.block_size)
+    EventMachine::PeriodicTimer.new(1) do
+      unless (@migrating[table])
+        Fiber.new do
+          @migrating[table] = true
+          
+          next_claim += 1
+          do_query(source_db, "UPDATE `#{changes_table}` SET claim=? WHERE claim IS NULL LIMIT ?", next_claim, @strategy.block_size)
 
-            result = do_query(source_db, "SELECT id FROM `#{changes_table}` WHERE claim=?", next_claim)
+          result = do_query(source_db, "SELECT id FROM `#{changes_table}` WHERE claim=?", next_claim)
 
-            id_block = result.to_a.collect { |r| r[:id] }
+          id_block = result.to_a.collect { |r| r[:id] }
 
-            if (id_block.length > 0)
-              log("Claim \##{next_claim} yields #{id_block.length} records.")
+          if (id_block.length > 0)
+            log("Claim \##{next_claim} yields #{id_block.length} records.")
 
-              selected = do_query(source_db, "SELECT * FROM `#{table}` WHERE id IN (?)", id_block)
+            selected = do_query(source_db, "SELECT * FROM `#{table}` WHERE id IN (?)", id_block)
 
-              values = selected.collect do |row|
-                "(%s)" % [
-                  escaper(
-                    source_db,
-                    columns.collect do |column|
-                      row[column]
-                    end
-                  )
-                ]
-              end.join(',')
+            values = selected.collect do |row|
+              "(%s)" % [
+                escaper(
+                  source_db,
+                  columns.collect do |column|
+                    row[column]
+                  end
+                )
+              ]
+            end.join(',')
 
-              do_query(target_db, "REPLACE INTO `#{table}` (#{columns.join(',')}) VALUES #{values}")
-            else
-              unless (@strategy.persist?)
-                @strategy.complete = true
-              end
+            do_query(target_db, "REPLACE INTO `#{table}` (#{columns.join(',')}) VALUES #{values}")
+          else
+            unless (@strategy.persist?)
+              @strategy.complete = true
             end
-  
-            @migrating[table] = false
-          end.resume
-        end
+          end
+
+          @migrating[table] = false
+        end.resume
       end
-    end.resume
+    end
   end
 
   def table_create_test(db, table_config)

@@ -26,14 +26,14 @@ class TestTableflipArgumentParser < Test::Unit::TestCase
   def test_one_table_one_action
     strategy = Tableflip::ArgumentParser.new.parse(%w[ --track example_table ])
 
-    assert_equal [ :track ], strategy.actions
+    assert_equal [ :tracking_add ], strategy.actions
     assert_equal [ 'example_table' ], strategy.tables
   end
 
   def test_one_table_many_actions
-    strategy = Tableflip::ArgumentParser.new.parse(%w[ --track --migrate target_env example_table ])
+    strategy = Tableflip::ArgumentParser.new.parse(%w[ --track --migrate --target=target_env example_table ])
 
-    assert_equal [ :track, :migrate ], strategy.actions
+    assert_equal [ :tracking_add, :table_migrate ], strategy.actions
     assert_equal [ 'example_table' ], strategy.tables
     assert_equal 'target_env', strategy.target_env
   end

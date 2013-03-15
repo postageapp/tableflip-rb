@@ -192,6 +192,36 @@ class Tableflip::Executor
     end
   end
 
+  def tracking_seed(db, table_config)
+    table = table_config[:table]
+    changes_table = "#{table}__changes"
+
+    Fiber.new do
+      result = do_query(source_db, "SELECT id FROM `#{table}` #{@strategy.where}")
+
+      ids = result.collect { |r| r[:id] }
+
+      if (ids.any?)
+        log("Populating #{changes_table} from #{table}")
+
+        ((ids.length / @strategy.block_size) + 1).times do |n|
+          start_offset = @strategy.block_size * n
+          id_block = ids[start_offset, @strategy.block_size]
+
+          if (id_block and id_block.any?)
+            query = "INSERT IGNORE INTO `#{changes_table}` (id) VALUES %s" % [
+              id_block.collect { |id| "(%d)" % id }.join(',')
+            ]
+          end
+
+          do_query(source_db, query)
+        end
+      else
+        log("No records to migrate from #{table}")
+      end
+    end.resume
+  end
+
   def table_report_status(source_db, target_db, table_config)
     table = table_config[:table]
     changes_table = "#{table}__changes"
@@ -219,35 +249,16 @@ class Tableflip::Executor
     table = table_config[:table]
     changes_table = "#{table}__changes"
 
-    result = do_query(source_db, "SELECT COUNT(*) AS rows FROM `#{table}`")
+    result = do_query(source_db, "SELECT COUNT(*) AS rows FROM `#{changes_table}` WHERE claim IS NULL")
     count = table_config[:count] = result.first[:rows]
 
-    log("#{table} has #{table_config[:count]} records.")
+    log("#{table} has #{table_config[:count]} records to migrate.")
 
     next_claim = do_query(source_db, "SELECT MAX(claim) AS claim FROM `#{changes_table}`").first[:claim] || 0
 
     Fiber.new do
       result = do_query(source_db, "SHOW FIELDS FROM `#{table}`")
       columns = result.collect { |r| r[:Field].to_sym }
-
-      result = do_query(source_db, "SELECT id FROM `#{table}`")
-
-      ids = result.collect { |r| r[:id] }
-
-      log("Populating #{changes_table} from #{table}")
-
-      ((count / @strategy.block_size) + 1).times do |n|
-        start_offset = @strategy.block_size * n
-        id_block = ids[start_offset, @strategy.block_size]
-
-        if (id_block and id_block.any?)
-          query = "INSERT IGNORE INTO `#{changes_table}` (id) VALUES %s" % [
-            id_block.collect { |id| "(%d)" % id }.join(',')
-          ]
-        end
-
-        do_query(source_db, query)
-      end
 
       @migrating ||= { }
 
@@ -281,7 +292,9 @@ class Tableflip::Executor
 
               do_query(target_db, "REPLACE INTO `#{table}` (#{columns.join(',')}) VALUES #{values}")
             else
-              @strategy.complete = true
+              unless (@strategy.persist?)
+                @strategy.complete = true
+              end
             end
   
             @migrating[table] = false

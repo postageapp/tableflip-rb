@@ -13,6 +13,7 @@ class Tableflip::Strategy
   attr_accessor :fuzz_intensity
   attr_accessor :block_size
   attr_accessor :persist
+  attr_accessor :where
 
   # == Class Methods ========================================================
 

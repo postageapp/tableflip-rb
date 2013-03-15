@@ -47,6 +47,9 @@ class Tableflip::ArgumentParser
       parser.on("-t", "--track", "Add tracking triggers on tables") do
         strategy.actions << :tracking_add
       end
+      parser.on("-d", "--seed", "Seed the tracking table with entries from the source table") do
+        strategy.actions << :tracking_seed
+      end
       parser.on("-r", "--remove", "Remove tracking triggers from tables") do
         strategy.actions << :tracking_remove
       end
@@ -77,6 +80,9 @@ class Tableflip::ArgumentParser
       end
       parser.on("-p", "--persist", "Keep running perpetually") do
         strategy.persist = true
+      end
+      parser.on("-w","--where=s", "Add conditions to selecting") do |s|
+        strategy.where = s
       end
       parser.on("-h", "--help", "Display this help") do
         strategy.message = parser.to_s

@@ -271,6 +271,7 @@ class Tableflip::Executor
       if (id_block.length == 0)
         if (@strategy.persist?)
           sleep(1)
+          next
         else
           break
         end

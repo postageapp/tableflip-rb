@@ -5,6 +5,7 @@ class Tableflip::Strategy
 
   attr_accessor :actions
   attr_accessor :config_path
+  attr_accessor :exclude_columns
   attr_accessor :source_env
   attr_accessor :tables
   attr_accessor :target_env
@@ -23,6 +24,7 @@ class Tableflip::Strategy
   def initialize
     @actions = [ ]
     @tables = [ ]
+    @exclude_columns = [ ]
     @fuzz_intensity = 1
     @block_size = 10000
 

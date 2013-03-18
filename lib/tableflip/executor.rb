@@ -252,7 +252,7 @@ class Tableflip::Executor
     next_claim = do_query(source_db, "SELECT MAX(claim) AS claim FROM `#{changes_table}`").first[:claim] || 0
 
     result = do_query(source_db, "SHOW FIELDS FROM `#{table}`")
-    columns = result.collect { |r| r[:Field].to_sym }
+    columns = result.collect { |r| r[:Field].to_sym } - @strategy.exclude_columns.collect(&:to_sym)
 
     @migrating ||= { }
 

@@ -68,6 +68,11 @@ class Tableflip::ArgumentParser
       parser.on("-e", "--env=s", "Establish primary environment") do |s|
         strategy.source_env = s
       end
+      parser.on("-x", "--exclude=s", "Exclude column(s) from migration") do |s|
+        s.split(/,/).each do |column|
+          strategy.exclude_columns << column
+        end
+      end
       parser.on("-k", "--create-test", "Creates a test table") do
         strategy.actions << :table_create_test
       end

@@ -61,7 +61,10 @@ class Tableflip::Executor
         @strategy.tables.each do |table|
           defer do
             queue = @strategy.actions.dup
-            source_db = Tableflip::DatabaseHandle.connect(@strategy.source_env)
+            source_db = Tableflip::DatabaseHandle.connect(
+              @strategy.source_env,
+              :encoding => @strategy.encoding
+            )
 
             table_config = tables[table] = {
               :table => table,
@@ -81,10 +84,16 @@ class Tableflip::Executor
               when :table_migrate
                 @strategy.complete = false
 
-                target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
+                target_db = Tableflip::DatabaseHandle.connect(
+                  @strategy.target_env,
+                  :encoding => @strategy.encoding
+                )
                 table_migrate(source_db, target_db, table_config)
               when :table_report_status
-                target_db = Tableflip::DatabaseHandle.connect(@strategy.target_env)
+                target_db = Tableflip::DatabaseHandle.connect(
+                  @strategy.target_env,
+                  :encoding => @strategy.encoding
+                )
                 table_report_status(source_db, target_db, table_config)
               when :table_count
                 table_count(source_db, target_db, table_config)

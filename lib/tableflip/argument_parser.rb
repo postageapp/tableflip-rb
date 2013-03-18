@@ -17,6 +17,7 @@ class Tableflip::ArgumentParser
   def parse(args, env = nil)
     strategy = Tableflip::Strategy.new
 
+    strategy.encoding = 'UTF8'
     strategy.source_env = self.class.default_env(env)
 
     _parser = parser(strategy)
@@ -72,6 +73,9 @@ class Tableflip::ArgumentParser
         s.split(/,/).each do |column|
           strategy.exclude_columns << column
         end
+      end
+      parser.on("-n", "--encoding=s", "Set connection encoding") do |s|
+        strategy.encoding = s
       end
       parser.on("-k", "--create-test", "Creates a test table") do
         strategy.actions << :table_create_test

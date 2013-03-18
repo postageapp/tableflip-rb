@@ -76,8 +76,8 @@ class Tableflip::DatabaseHandle
     options
   end
 
-  def self.connect(env)
-    Mysql2::EM::Client.new(self.environment_config(env))
+  def self.connect(env, options)
+    Mysql2::EM::Client.new(self.environment_config(env).merge(options))
   end
 
   # == Instance Methods =====================================================

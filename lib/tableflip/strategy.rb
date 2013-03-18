@@ -5,6 +5,7 @@ class Tableflip::Strategy
 
   attr_accessor :actions
   attr_accessor :config_path
+  attr_accessor :encoding
   attr_accessor :exclude_columns
   attr_accessor :source_env
   attr_accessor :tables

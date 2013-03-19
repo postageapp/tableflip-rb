@@ -130,7 +130,7 @@ class Tableflip::Executor
 
   def do_query(db, query, *values)
     fiber = Fiber.current
-    query = query.encode(@strategy.encoding).gsub('?') do |s|
+    query = query.encode('BINARY').gsub('?') do |s|
       escaper(db, values.shift)
     end
 

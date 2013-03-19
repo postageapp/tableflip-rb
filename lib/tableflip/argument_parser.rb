@@ -42,6 +42,9 @@ class Tableflip::ArgumentParser
       parser.separator("")
       parser.separator("Options:")
 
+      parser.on("-b", "--block=s", "Transfer data in blocks of N rows") do |s|
+        strategy.block_size = s.to_i
+      end
       parser.on("-f", "--config=s") do |path|
         strategy.config_path = path
       end

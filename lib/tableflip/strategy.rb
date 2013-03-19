@@ -4,19 +4,19 @@ class Tableflip::Strategy
   # == Properties ===========================================================
 
   attr_accessor :actions
+  attr_accessor :block_size
+  attr_accessor :complete
   attr_accessor :config_path
+  attr_accessor :debug_queries
   attr_accessor :encoding
   attr_accessor :exclude_columns
+  attr_accessor :fuzz_intensity
+  attr_accessor :message
+  attr_accessor :persist
   attr_accessor :source_env
   attr_accessor :tables
   attr_accessor :target_env
-  attr_accessor :message
-  attr_accessor :complete
-  attr_accessor :fuzz_intensity
-  attr_accessor :block_size
-  attr_accessor :persist
   attr_accessor :where
-  attr_accessor :debug_queries
 
   # == Class Methods ========================================================
 

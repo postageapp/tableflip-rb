@@ -1,4 +1,9 @@
 class Tableflip::Executor
+  class BinaryString < String
+  end
+
+  # == Instance Methods =====================================================
+
   def initialize(strategy)
     @strategy = strategy
 
@@ -115,6 +120,8 @@ class Tableflip::Executor
     case (value)
     when nil
       'NULL'
+    when BinaryString
+      "0x%s" % value.unpack("H*")
     when Fixnum
       value
     when Date
@@ -130,7 +137,7 @@ class Tableflip::Executor
 
   def do_query(db, query, *values)
     fiber = Fiber.current
-    query = query.encode('BINARY').gsub('?') do |s|
+    query = query.gsub('?') do |s|
       escaper(db, values.shift)
     end
 
@@ -261,7 +268,32 @@ class Tableflip::Executor
     next_claim = do_query(source_db, "SELECT MAX(claim) AS claim FROM `#{changes_table}`").first[:claim] || 0
 
     result = do_query(source_db, "SHOW FIELDS FROM `#{table}`")
-    columns = result.collect { |r| r[:Field].to_sym } - @strategy.exclude_columns.collect(&:to_sym)
+
+    exclusions = Hash[
+      @strategy.exclude_columns.collect do |column|
+        [ column.to_sym, true ]
+      end
+    ]
+
+    columns = [ ]
+    binary_columns = { }
+
+    result.each do |r|
+      column = r[:Field].to_sym
+
+      next if (exclusions[column])
+
+      columns << column
+
+      case (r[:Type].downcase)
+      when 'tinyblob','blob','mediumblob','longblob','binary','varbinary'
+        binary_columns[column] = true
+      end
+    end
+
+    if (binary_columns.any?)
+      log("#{table} has binary columns: #{binary_columns.keys.join(',')}")
+    end
 
     @migrating ||= { }
 
@@ -295,7 +327,7 @@ class Tableflip::Executor
           escaper(
             source_db,
             columns.collect do |column|
-              row[column]
+              binary_columns[column] ? BinaryString.new(row[column]) : row[column]
             end
           )
         ]

@@ -17,7 +17,6 @@ class Tableflip::ArgumentParser
   def parse(args, env = nil)
     strategy = Tableflip::Strategy.new
 
-    strategy.encoding = 'UTF8'
     strategy.source_env = self.class.default_env(env)
 
     _parser = parser(strategy)
@@ -37,10 +36,14 @@ class Tableflip::ArgumentParser
 
   def parser(strategy)
     OptionParser.new do |parser|
-      parser.banner = "Usage: tableflip [options] table_name [table_name [...]]"
+      parser.banner = "Usage: tableflip [options] [table_name [table_name [...]]]"
 
       parser.separator("")
       parser.separator("Options:")
+
+      parser.on("-a", "--all", "Track all tables") do |s|
+        strategy.tables << :__all__
+      end
 
       parser.on("-b", "--block=s", "Transfer data in blocks of N rows") do |s|
         strategy.block_size = s.to_i

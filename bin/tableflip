@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-$: << File.expand_path('../lib', File.dirname(__FILE__))
+$: << File.expand_path('../lib', File.dirname(File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))
 
 ENV['TZ'] = 'UTC'
 

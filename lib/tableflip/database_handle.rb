@@ -5,11 +5,11 @@ require 'yaml'
 class Tableflip::DatabaseHandle
   # == Constants ============================================================
   
-  DATABASE_CONFIG_FILE ='database.yml'
+  DATABASE_CONFIG_FILE = 'database.yml'
 
   DEFAULT_OPTIONS = {
     :symbolize_keys => true,
-    :encoding => 'UTF8'
+    :encoding => 'utf-8'
   }.freeze
 
   PARAM_MAP = Hash.new do |h, k|

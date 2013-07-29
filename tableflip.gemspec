@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = "tableflip"
-  s.version = "0.1.0"
+  s.version = "0.1.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Scott Tadman"]
-  s.date = "2013-03-14"
+  s.date = "2013-07-29"
   s.description = "Flips tables from one database to another"
   s.email = "scott@twg.ca"
   s.executables = ["tableflip"]

@@ -62,22 +62,45 @@ class Tableflip::Executor
     tables = { }
 
     EventMachine.synchrony do
+      if (@strategy.tables.include?(:__all__))
+        source_db = Tableflip::DatabaseHandle.connect(
+          @strategy.source_env,
+          :encoding => @strategy.encoding
+        )
+
+        @strategy.tables.delete(:__all__)
+
+        result = do_query(source_db, "SHOW TABLES")
+
+        result.each do |row|
+          table_name = row.first[1]
+
+          case (table_name)
+          when 'schema_migrations', /__changes/
+            next
+          end
+
+          @strategy.tables << table_name
+        end
+      end
+
       await do
         @strategy.tables.each do |table|
           defer do
             queue = @strategy.actions.dup
-            source_db = Tableflip::DatabaseHandle.connect(
-              @strategy.source_env,
-              :encoding => @strategy.encoding
-            )
 
             table_config = tables[table] = {
               :table => table,
               :queue => queue
             }
-          
+                
             while (action = queue.shift)
               log("#{table} [#{action}]")
+
+              source_db = Tableflip::DatabaseHandle.connect(
+                @strategy.source_env,
+                :encoding => @strategy.encoding
+              )
 
               case (action)
               when :tracking_add
@@ -145,25 +168,42 @@ class Tableflip::Executor
       puts "SQL> #{query}"
     end
 
-    deferred = db.query(query)
+    completed = false
 
-    deferred.callback do |result|
-      EventMachine.next_tick do
-        fiber.resume(result)
+    while (!completed)
+      begin
+        deferred = db.query(query)
+
+        deferred.callback do |result|
+          EventMachine.next_tick do
+            completed = true
+
+            fiber.resume(result)
+          end
+        end
+
+        deferred.errback do |err|
+          EventMachine.next_tick do
+            completed = true
+
+            fiber.resume(err)
+          end
+        end
+
+        case (response = Fiber.yield)
+        when Exception
+          raise response
+        else
+          return response
+        end
+
+      rescue Mysql2::Error => e
+        if (e.to_s.match(/MySQL server has gone away/))
+          # Ignore
+        else
+          raise e
+        end
       end
-    end
-
-    deferred.errback do |err|
-      EventMachine.next_tick do
-        fiber.resume(err)
-      end
-    end
-
-    case (response = Fiber.yield)
-    when Exception
-      raise response
-    else
-      response
     end
   end
 
@@ -311,7 +351,12 @@ class Tableflip::Executor
 
       if (id_block.length == 0)
         if (@strategy.persist?)
-          sleep(1)
+          EventMachine::Timer.new(1) do
+            fiber.resume
+          end
+
+          Fiber.yield
+
           next
         else
           break
@@ -327,7 +372,7 @@ class Tableflip::Executor
           escaper(
             source_db,
             columns.collect do |column|
-              binary_columns[column] ? BinaryString.new(row[column]) : row[column]
+              (binary_columns[column] and row[column]) ? BinaryString.new(row[column]) : row[column]
             end
           )
         ]

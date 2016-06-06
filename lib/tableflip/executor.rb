@@ -378,7 +378,14 @@ class Tableflip::Executor
         ]
       end
 
-      do_query(target_db, "REPLACE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}")
+      if (values.any?)
+        case (@strategy.migrate_method)
+        when :insert
+          do_query(target_db, "INSERT IGONORE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}")
+        else
+          do_query(target_db, "REPLACE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}")
+        end
+      end
 
       selected = values.length
       migrated += values.length

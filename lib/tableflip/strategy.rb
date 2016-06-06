@@ -12,6 +12,7 @@ class Tableflip::Strategy
   attr_accessor :exclude_columns
   attr_accessor :fuzz_intensity
   attr_accessor :message
+  attr_accessor :migrate_method
   attr_accessor :persist
   attr_accessor :source_env
   attr_accessor :tables
@@ -28,6 +29,7 @@ class Tableflip::Strategy
     @exclude_columns = [ ]
     @fuzz_intensity = 1
     @block_size = 10000
+    @migrate_method = :replace
 
     yield(self) if (block_given?)
   end

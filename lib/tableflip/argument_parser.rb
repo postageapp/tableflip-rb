@@ -44,7 +44,9 @@ class Tableflip::ArgumentParser
       parser.on("-a", "--all", "Track all tables") do |s|
         strategy.tables << :__all__
       end
-
+      parser.on("-i", "--insert", "Use INSERT IGNORE instead of REPLACE INTO") do
+        strategy.migrate_method = :insert
+      end
       parser.on("-b", "--block=s", "Transfer data in blocks of N rows") do |s|
         strategy.block_size = s.to_i
       end
@@ -63,7 +65,7 @@ class Tableflip::ArgumentParser
       parser.on("-o", "--target=s", "Set target environment") do |s|
         strategy.target_env = s
       end
-      parser.on("-m", "--migrate", "Migrate tables to environment") do
+      parser.on("-m", "--migrate", "Migrate data from source to target") do
         strategy.actions << :table_migrate
       end
       parser.on("-c", "--count", "Count number of records in source table") do

@@ -136,9 +136,10 @@ class Tableflip::Executor
       end
 
       EventMachine.stop_event_loop
+    rescue Exception => e
+      p e
     end
-  rescue Exception => e
-    p e
+
   end
 
   def escaper(db, value)

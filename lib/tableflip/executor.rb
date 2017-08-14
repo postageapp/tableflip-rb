@@ -61,81 +61,82 @@ class Tableflip::Executor
 
     tables = { }
 
-    EventMachine.synchrony do
-      if (@strategy.tables.include?(:__all__))
-        source_db = Tableflip::DatabaseHandle.connect(
-          @strategy.source_env,
-          :encoding => @strategy.encoding
-        )
+    begin
+      EventMachine.synchrony do
+        if (@strategy.tables.include?(:__all__))
+          source_db = Tableflip::DatabaseHandle.connect(
+            @strategy.source_env,
+            :encoding => @strategy.encoding
+          )
 
-        @strategy.tables.delete(:__all__)
+          @strategy.tables.delete(:__all__)
 
-        result = do_query(source_db, "SHOW TABLES")
+          result = do_query(source_db, "SHOW TABLES")
 
-        result.each do |row|
-          table_name = row.first[1]
+          result.each do |row|
+            table_name = row.first[1]
 
-          case (table_name)
-          when 'schema_migrations', /__changes/
-            next
+            case (table_name)
+            when 'schema_migrations', /__changes/
+              next
+            end
+
+            @strategy.tables << table_name
           end
-
-          @strategy.tables << table_name
         end
-      end
 
-      await do
-        @strategy.tables.each do |table|
-          defer do
-            queue = @strategy.actions.dup
+        await do
+          @strategy.tables.each do |table|
+            defer do
+              queue = @strategy.actions.dup
 
-            table_config = tables[table] = {
-              :table => table,
-              :queue => queue
-            }
+              table_config = tables[table] = {
+                :table => table,
+                :queue => queue
+              }
 
-            while (action = queue.shift)
-              log("#{table} [#{action}]")
+              while (action = queue.shift)
+                log("#{table} [#{action}]")
 
-              source_db = Tableflip::DatabaseHandle.connect(
-                @strategy.source_env,
-                :encoding => @strategy.encoding
-              )
-
-              case (action)
-              when :tracking_add
-                tracking_add(source_db, table_config)
-              when :tracking_remove
-                tracking_remove(source_db, table_config)
-              when :tracking_seed
-                tracking_seed(source_db, table_config)
-              when :table_migrate
-                @strategy.complete = false
-
-                target_db = Tableflip::DatabaseHandle.connect(
-                  @strategy.target_env,
+                source_db = Tableflip::DatabaseHandle.connect(
+                  @strategy.source_env,
                   :encoding => @strategy.encoding
                 )
-                table_migrate(source_db, target_db, table_config)
-              when :table_report_status
-                target_db = Tableflip::DatabaseHandle.connect(
-                  @strategy.target_env,
-                  :encoding => @strategy.encoding
-                )
-                table_report_status(source_db, target_db, table_config)
-              when :table_count
-                table_count(source_db, target_db, table_config)
-              when :table_create_test
-                table_create_test(source_db, table_config)
-              when :table_fuzz
-                table_fuzz(source_db, table_config, @strategy.fuzz_intensity)
+
+                case (action)
+                when :tracking_add
+                  tracking_add(source_db, table_config)
+                when :tracking_remove
+                  tracking_remove(source_db, table_config)
+                when :tracking_seed
+                  tracking_seed(source_db, table_config)
+                when :table_migrate
+                  @strategy.complete = false
+
+                  target_db = Tableflip::DatabaseHandle.connect(
+                    @strategy.target_env,
+                    :encoding => @strategy.encoding
+                  )
+                  table_migrate(source_db, target_db, table_config)
+                when :table_report_status
+                  target_db = Tableflip::DatabaseHandle.connect(
+                    @strategy.target_env,
+                    :encoding => @strategy.encoding
+                  )
+                  table_report_status(source_db, target_db, table_config)
+                when :table_count
+                  table_count(source_db, target_db, table_config)
+                when :table_create_test
+                  table_create_test(source_db, table_config)
+                when :table_fuzz
+                  table_fuzz(source_db, table_config, @strategy.fuzz_intensity)
+                end
               end
             end
           end
         end
-      end
 
-      EventMachine.stop_event_loop
+        EventMachine.stop_event_loop
     rescue Exception => e
       p e
     end

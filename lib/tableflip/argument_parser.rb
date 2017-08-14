@@ -77,6 +77,9 @@ class Tableflip::ArgumentParser
       parser.on("-e", "--env=s", "Establish primary environment") do |s|
         strategy.source_env = s
       end
+      parser.on('--ignore-binary=s', 'Ignore binary encoding requirement for column') do |s|
+        strategy.ignore_binary << s.to_sym
+      end
       parser.on("-x", "--exclude=s", "Exclude column(s) from migration") do |s|
         s.split(/,/).each do |column|
           strategy.exclude_columns << column

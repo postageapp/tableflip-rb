@@ -332,7 +332,9 @@ class Tableflip::Executor
 
       case (r[:Type].downcase)
       when 'tinyblob','blob','mediumblob','longblob','binary','varbinary'
-        binary_columns[column] = true
+        unless (@strategy.ignore_binary.include?(column))
+          binary_columns[column] = true
+        end
       end
     end
 

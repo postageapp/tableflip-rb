@@ -93,7 +93,7 @@ class Tableflip::Executor
               :table => table,
               :queue => queue
             }
-                
+
             while (action = queue.shift)
               log("#{table} [#{action}]")
 
@@ -137,6 +137,8 @@ class Tableflip::Executor
 
       EventMachine.stop_event_loop
     end
+  rescue Exception => e
+    p e
   end
 
   def escaper(db, value)

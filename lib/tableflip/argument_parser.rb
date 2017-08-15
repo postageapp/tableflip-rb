@@ -1,14 +1,18 @@
 require 'optparse'
+require 'yaml'
 
 class Tableflip::ArgumentParser
   # == Constants ============================================================
+
+  TABLE_SPECIFIC_STRATEGY = '-g'
+  TABLE_SPECIFIC_STRATEGY_FILE_NAME = 'table_migrating_strategies.yml'
 
   # == Class Methods ========================================================
 
   def self.default_env(env = nil)
     (env || ENV)['RAILS_ENV'] || 'development'
   end
-  
+
   # == Instance Methods =====================================================
 
   def initialize
@@ -18,6 +22,12 @@ class Tableflip::ArgumentParser
     strategy = Tableflip::Strategy.new
 
     strategy.source_env = self.class.default_env(env)
+
+    # Strip off all other commands if using specific table strategy
+    if args.include?(TABLE_SPECIFIC_STRATEGY)
+      get_option_index = args.index(TABLE_SPECIFIC_STRATEGY)
+      args = [TABLE_SPECIFIC_STRATEGY, args[get_option_index + 1]]
+    end
 
     _parser = parser(strategy)
 
@@ -106,6 +116,33 @@ class Tableflip::ArgumentParser
       end
       parser.on("-h", "--help", "Display this help") do
         strategy.message = parser.to_s
+      end
+      parser.on("-g", "--table-strategy=s", "Specifc table migrating strategy") do |s|
+        load_file = File.open(
+          File.expand_path(File.join('..', '..', 'config', TABLE_SPECIFIC_STRATEGY_FILE_NAME), File.dirname(__FILE__))
+        )
+
+        table_strategy = YAML.load(load_file)
+
+        if table_strategy.keys.include?(s)
+          loaded_strategy = table_strategy[s]
+
+          args = loaded_strategy.map do |ele|
+            case ele
+            when Hash
+              key = ele.keys[0]
+              value = ele[key]
+              "--%s=%s" %[key, value]
+            when String
+              "--%s" % ele
+            end
+          end << s
+
+          _parser = parser(strategy)
+          _parser.parse!(args)
+
+          strategy.tables << s
+        end
       end
     end
   end

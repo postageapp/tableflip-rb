@@ -126,23 +126,25 @@ class Tableflip::ArgumentParser
 
         if table_strategy.keys.include?(s)
           loaded_strategy = table_strategy[s]
-
-          args = loaded_strategy.map do |ele|
-            case ele
-            when Hash
-              key = ele.keys[0]
-              value = ele[key]
-              "--%s=%s" %[key, value]
-            when String
-              "--%s" % ele
-            end
-          end << s
-
-          _parser = parser(strategy)
-          _parser.parse!(args)
-
-          strategy.tables << s
+        else
+          loaded_strategy = table_strategy["default"]
         end
+
+        args = loaded_strategy.map do |ele|
+          case ele
+          when Hash
+            key = ele.keys[0]
+            value = ele[key]
+            "--%s=%s" %[key, value]
+          when String
+            "--%s" % ele
+          end
+        end << s
+
+        _parser = parser(strategy)
+        _parser.parse!(args)
+
+        strategy.tables << s
       end
     end
   end

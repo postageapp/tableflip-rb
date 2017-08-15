@@ -146,7 +146,7 @@ class Tableflip::Executor
     when nil
       'NULL'
     when BinaryString
-      "0x%s" % value.unpack("H*")
+      "x'%s'" % value.unpack("H*")
     when Fixnum
       value
     when Date

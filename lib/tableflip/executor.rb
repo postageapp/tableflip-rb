@@ -399,6 +399,9 @@ class Tableflip::Executor
 
       log("Migrated %d/%d records for #{table}" % [ migrated, count ])
     end
+  rescue Exception => e
+    p "-----------------------ERROR on table #{table}------------------------------------"
+    p e
   end
 
   def table_create_test(db, table_config)

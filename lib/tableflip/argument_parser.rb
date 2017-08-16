@@ -124,10 +124,20 @@ class Tableflip::ArgumentParser
 
         table_strategy = YAML.load(load_file)
 
+        loaded_strategy = table_strategy["default"]
+
         if table_strategy.keys.include?(s)
-          loaded_strategy = table_strategy[s]
-        else
-          loaded_strategy = table_strategy["default"]
+          table_strategy[s].each_with_index do |rule, index|
+            if rule.class == Hash
+              loaded_strategy.each_with_index do |default_rule, index_default|
+                if default_rule.class == Hash and default_rule.keys == rule.keys
+                  loaded_strategy[index_default] = table_strategy[s][index]
+                end
+              end
+            else
+              loaded_strategy << rule
+            end
+          end
         end
 
         args = loaded_strategy.map do |ele|

@@ -1,20 +1,19 @@
 require 'mysql2'
-require 'mysql2/em'
 require 'yaml'
 
 class Tableflip::DatabaseHandle
   # == Constants ============================================================
   
-  DATABASE_CONFIG_FILE = 'database.yml'
+  DATABASE_CONFIG_FILE = 'database.yml'.freeze
 
   DEFAULT_OPTIONS = {
-    :symbolize_keys => true,
-    :encoding => 'utf-8'
+    symbolize_keys: true,
+    encoding: 'utf-8'
   }.freeze
 
-  PARAM_MAP = Hash.new do |h, k|
-    k.to_sym
-  end
+  # == Properties ===========================================================
+
+  attr_reader :db
 
   # == Class Methods ========================================================
 
@@ -68,7 +67,7 @@ class Tableflip::DatabaseHandle
     options = DEFAULT_OPTIONS.dup
 
     _config.each do |k, v|
-      options[PARAM_MAP[k]] = v
+      options[k.to_sym] = v
     end
 
     options[:loggers] = [ ]
@@ -76,10 +75,13 @@ class Tableflip::DatabaseHandle
     options
   end
 
-  def self.connect(env, options)
-    Mysql2::EM::Client.new(self.environment_config(env).merge(options))
-  end
-
   # == Instance Methods =====================================================
 
+  def initialize(env, options = nil)
+    @db = Sequel.connect(self.class.environment_config(env).merge(options || { }))
+  end
+
+  def method_missing(*args)
+    @db.send(*args)
+  end
 end

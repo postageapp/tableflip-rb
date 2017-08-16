@@ -1,11 +1,23 @@
 #!/usr/bin/env ruby
 
-$: << File.expand_path('../lib', File.dirname(File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__))
-
 ENV['TZ'] = 'UTC'
+
+$LOAD_PATH << File.expand_path(
+  '../lib',
+  File.dirname(File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__)
+)
 
 require 'tableflip'
 
-strategy = Tableflip::ArgumentParser.new.parse(ARGV)
+strategies = Tableflip::ArgumentParser.new.parse(ARGV)
+
+if (strategies.first.dry_run)
+  strategies.each do |strategy|
+    puts 'Tables: %s' % [ strategy.tables.join(' ') ]
+    puts '  Actions: %s' % strategy.actions.join(' ')
+  end
+
+  exit(0)
+end
 
 Tableflip::Executor.new(strategy).execute!

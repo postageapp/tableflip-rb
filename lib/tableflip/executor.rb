@@ -93,7 +93,7 @@ class Tableflip::Executor
               :table => table,
               :queue => queue
             }
-                
+            
             while (action = queue.shift)
               log("#{table} [#{action}]")
 
@@ -129,6 +129,8 @@ class Tableflip::Executor
                 table_create_test(source_db, table_config)
               when :table_fuzz
                 table_fuzz(source_db, table_config, @strategy.fuzz_intensity)
+              else
+                raise "Unknown action: #{action.inspect}"
               end
             end
           end
@@ -158,10 +160,13 @@ class Tableflip::Executor
     end
   end
 
-  def do_query(db, query, *values)
+  def do_query(db, query, *values, placeholders: true)
     fiber = Fiber.current
-    query = query.gsub('?') do |s|
-      escaper(db, values.shift)
+
+    if (placeholders)
+      query = query.gsub('?') do |s|
+        escaper(db, values.shift)
+      end
     end
 
     if (@strategy.debug_queries?)
@@ -327,7 +332,9 @@ class Tableflip::Executor
 
       case (r[:Type].downcase)
       when 'tinyblob','blob','mediumblob','longblob','binary','varbinary'
-        binary_columns[column] = true
+        unless (@strategy.ignore_binary.include?(column))
+          binary_columns[column] = true
+        end
       end
     end
 
@@ -381,9 +388,9 @@ class Tableflip::Executor
       if (values.any?)
         case (@strategy.migrate_method)
         when :insert
-          do_query(target_db, "INSERT IGNORE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}")
+          do_query(target_db, "INSERT IGNORE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}", placeholders: false)
         else
-          do_query(target_db, "REPLACE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}")
+          do_query(target_db, "REPLACE INTO `#{table}` (#{columns.collect { |c| "`#{c}`" }.join(',')}) VALUES #{values.join(',')}", placeholders: false)
         end
       end
 
@@ -392,6 +399,9 @@ class Tableflip::Executor
 
       log("Migrated %d/%d records for #{table}" % [ migrated, count ])
     end
+  rescue Exception => e
+    p "-----------------------ERROR on table #{table}------------------------------------"
+    p e
   end
 
   def table_create_test(db, table_config)
@@ -408,6 +418,7 @@ class Tableflip::Executor
     table = table_config[:table]
 
     EventMachine::PeriodicTimer.new(1) do
+      p "INSERTING: #{@inserting}"
       unless (@inserting)
         @inserting = true
 

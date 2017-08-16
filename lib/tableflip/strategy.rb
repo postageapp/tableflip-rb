@@ -11,6 +11,7 @@ class Tableflip::Strategy
   attr_accessor :encoding
   attr_accessor :exclude_columns
   attr_accessor :fuzz_intensity
+  attr_reader :ignore_binary
   attr_accessor :message
   attr_accessor :migrate_method
   attr_accessor :persist
@@ -27,6 +28,7 @@ class Tableflip::Strategy
     @actions = [ ]
     @tables = [ ]
     @exclude_columns = [ ]
+    @ignore_binary = [ ]
     @fuzz_intensity = 1
     @block_size = 10000
     @migrate_method = :replace
